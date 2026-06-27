@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Agent Architecture Analysis</title>
+    <style>
+      :root {
+        --bg: #f7f8fb;
+        --panel: #ffffff;
+        --ink: #172033;
+        --muted: #647084;
+        --line: #d8dee8;
+        --accent: #1b6b8f;
+        --accent-2: #8a4a21;
+        --soft: #e8f4f8;
+        --soft-2: #f6eee8;
+        --code: #102030;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      aside {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: #fff;
+        padding: 28px 24px;
+      }
+
+      main {
+        padding: 40px;
+        max-width: 1280px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        letter-spacing: 0;
+        line-height: 1.18;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 34px;
+      }
+
+      h2 {
+        margin: 42px 0 16px;
+        padding-top: 8px;
+        font-size: 26px;
+      }
+
+      h3 {
+        margin: 24px 0 10px;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      code {
+        padding: 2px 5px;
+        border: 1px solid #dce4ee;
+        border-radius: 5px;
+        background: #f2f5f8;
+        color: var(--code);
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f5f7fa;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0 22px;
+        background: #fff;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #eef3f8;
+      }
+
+      .kicker {
+        margin-bottom: 6px;
+        color: var(--accent-2);
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 900px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .toc-title {
+        margin: 0 0 12px;
+        font-weight: 800;
+      }
+
+      .toc {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .toc a {
+        display: block;
+        padding: 7px 9px;
+        border-radius: 7px;
+        color: #26364c;
+      }
+
+      .toc a:hover {
+        background: var(--soft);
+        text-decoration: none;
+      }
+
+      .meta {
+        display: grid;
+        gap: 8px;
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero,
+      .section,
+      .callout,
+      .diagram-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .hero {
+        padding: 28px;
+      }
+
+      .section {
+        padding: 24px;
+        margin-top: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin: 18px 0;
+      }
+
+      .metric {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 20px;
+      }
+
+      .metric span {
+        color: var(--muted);
+      }
+
+      .callout {
+        padding: 16px 18px;
+        margin: 18px 0;
+        background: var(--soft);
+      }
+
+      .callout.warn {
+        background: var(--soft-2);
+      }
+
+      .evidence {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0 16px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        padding: 3px 8px;
+        border: 1px solid #cdd7e3;
+        border-radius: 999px;
+        background: #fff;
+        color: #334258;
+        font-size: 12px;
+      }
+
+      .diagram-card {
+        margin: 18px 0 24px;
+        overflow: hidden;
+      }
+
+      .diagram-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: #f7fafc;
+      }
+
+      .diagram-head h3 {
+        margin: 0;
+      }
+
+      button {
+        border: 1px solid #b8c6d4;
+        border-radius: 7px;
+        background: #fff;
+        color: #223149;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+      }
+
+      button:hover {
+        background: #eef4f9;
+      }
+
+      .diagram-surface {
+        padding: 18px;
+        overflow: auto;
+      }
+
+      .mermaid {
+        min-width: 680px;
+      }
+
+      details {
+        border-top: 1px solid var(--line);
+        background: #fbfcfe;
+      }
+
+      summary {
+        cursor: pointer;
+        padding: 10px 16px;
+        color: var(--muted);
+      }
+
+      details pre {
+        margin: 0 16px 16px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(12, 22, 38, 0.68);
+        padding: 26px;
+      }
+
+      .modal.open {
+        display: block;
+      }
+
+      .modal-panel {
+        height: 100%;
+        overflow: auto;
+        border-radius: 8px;
+        background: #fff;
+        padding: 18px;
+      }
+
+      .modal-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .modal-title {
+        font-weight: 800;
+      }
+
+      .modal-content {
+        transform-origin: top left;
+        min-width: 900px;
+      }
+
+      .footer-note {
+        margin-top: 40px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 960px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        aside {
+          position: relative;
+          height: auto;
+        }
+
+        main {
+          padding: 24px;
+        }
+
+        .grid,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside>
+        <div class="toc-title">OpenClaw 分析导航</div>
+        <ol class="toc">
+          <li><a href="#summary">结论摘要</a></li>
+          <li><a href="#boundary">系统边界</a></li>
+          <li><a href="#lifecycle">请求生命周期</a></li>
+          <li><a href="#runner">Agent Runner 状态机</a></li>
+          <li><a href="#context">上下文与记忆</a></li>
+          <li><a href="#tools">工具、权限与插件</a></li>
+          <li><a href="#multi-agent">多 Agent 协作</a></li>
+          <li><a href="#observability">可观测性</a></li>
+          <li><a href="#judgment">设计判断</a></li>
+          <li><a href="#reading-path">阅读路径</a></li>
+          <li><a href="#glossary">术语表</a></li>
+          <li><a href="#unknowns">待验证点</a></li>
+        </ol>
+        <div class="meta">
+          <div>证据来源：本地源码、项目文档、inventory。</div>
+          <div>文档索引：<code>corepack pnpm docs:list</code></div>
+          <div>Inventory 文件数：<code>17019</code></div>
+        </div>
+      </aside>
+
+      <main>
+        <section id="summary" class="hero">
+          <div class="kicker">Architecture Report</div>
+          <h1>OpenClaw 项目分析</h1>
+          <p class="subtitle">
+            OpenClaw 是一个本地优先的多渠道 AI Gateway 与 agent runtime。它把消息入口、会话路由、模型调用、工具执行、插件能力、记忆检索、后台任务和多端协议放到同一个控制平面里，而不是只做一个 LLM chat wrapper。
+          </p>
+        </section>
+
+        <section class="section">
+          <h2>核心结论</h2>
+          <div class="grid">
+            <div class="metric">
+              <strong>Agent 类型</strong>
+              <span>本地 Gateway 编排的工具型、长任务型、插件扩展型个人 agent。</span>
+            </div>
+            <div class="metric">
+              <strong>控制面</strong>
+              <span>Gateway 负责 WebSocket RPC、鉴权、会话、路由、任务状态和事件。</span>
+            </div>
+            <div class="metric">
+              <strong>执行面</strong>
+              <span>嵌入式 Pi runner、ACP harness、子 agent、模型 provider 和工具系统。</span>
+            </div>
+          </div>
+
+          <div class="callout">
+            <strong>一句话架构判断：</strong>
+            项目最难的部分不是“怎么调模型”，而是如何在多渠道、多 provider、多插件、多会话和长任务并发下，保持热路径懒加载、会话一致、权限可控、上下文可审计。
+          </div>
+
+          <p>
+            从源码看，OpenClaw 的核心路径是：外部渠道或客户端把请求交给 Gateway；Gateway 解析会话、校验权限、返回 accepted run；后台任务进入 <code>agentCommand</code>；再进入嵌入式 Pi runner；runner 编译系统提示词、历史、附件、工具 schema 和 memory 结果，驱动模型和工具循环，最后把 transcript、事件、trajectory 和投递状态落回 Gateway 的会话控制面。
+          </p>
+          <div class="evidence">
+            <span class="chip">docs/concepts/architecture.md</span>
+            <span class="chip">docs/concepts/agent-loop.md</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:553</span>
+            <span class="chip">src/agents/agent-command.ts:1036</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:361</span>
+          </div>
+        </section>
+
+        <section id="boundary" class="section">
+          <h2>系统边界</h2>
+          <p>
+            Gateway 是长期驻留进程，也是系统边界。它接收 WebSocket 协议帧、渠道消息、CLI/移动端/桌面端请求，维护节点 presence、会话 store、任务状态和插件 runtime。Agent runner 不直接拥有外部世界；它通过 Gateway 和工具层访问渠道、文件、网络、媒体和插件能力。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/gateway/protocol/schema/frames.ts:137</span>
+            <span class="chip">src/gateway/protocol/schema/frames.ts:158</span>
+            <span class="chip">src/plugins/runtime/types.ts:77</span>
+            <span class="chip">src/plugins/runtime/index.ts:24</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>系统边界图</h3>
+              <button data-open-diagram="system-boundary">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="system-boundary">
+              <div class="mermaid">
+flowchart LR
+  user["人类用户 / 外部事件"] --> channels["渠道插件&lt;br/&gt;Telegram / Discord / Slack / Web / Mobile"]
+  clients["CLI / Desktop / Mobile / Nodes"] --> gateway["OpenClaw Gateway&lt;br/&gt;控制面：RPC、鉴权、会话、事件"]
+  channels --> gateway
+  gateway --> store["会话 store&lt;br/&gt;sessions.json + transcripts"]
+  gateway --> agent["agentCommand&lt;br/&gt;模型和运行配置解析"]
+  agent --> runner["执行面&lt;br/&gt;Embedded Pi runner / ACP"]
+  runner --> model["LLM providers&lt;br/&gt;OpenAI / Anthropic / Google / local"]
+  runner --> tools["Core tools + plugin tools"]
+  tools --> host["Host OS / Web / Media / Channels"]
+  runner --> memory["Memory/RAG plugins"]
+  gateway --> events["agent/chat/presence/health/cron events"]
+  events --> clients
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart LR
+  user["人类用户 / 外部事件"] --> channels["渠道插件&lt;br/&gt;Telegram / Discord / Slack / Web / Mobile"]
+  clients["CLI / Desktop / Mobile / Nodes"] --> gateway["OpenClaw Gateway&lt;br/&gt;控制面：RPC、鉴权、会话、事件"]
+  channels --> gateway
+  gateway --> store["会话 store&lt;br/&gt;sessions.json + transcripts"]
+  gateway --> agent["agentCommand&lt;br/&gt;模型和运行配置解析"]
+  agent --> runner["执行面&lt;br/&gt;Embedded Pi runner / ACP"]
+  runner --> model["LLM providers&lt;br/&gt;OpenAI / Anthropic / Google / local"]
+  runner --> tools["Core tools + plugin tools"]
+  tools --> host["Host OS / Web / Media / Channels"]
+  runner --> memory["Memory/RAG plugins"]
+  gateway --> events["agent/chat/presence/health/cron events"]
+  events --> clients</code></pre>
+            </details>
+          </div>
+
+          <h3>边界要点</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>边界</th>
+                <th>职责</th>
+                <th>证据</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Gateway protocol</td>
+                <td><code>req</code>、<code>res</code>、<code>event</code> 三类顶层帧，连接首帧带协议范围、client、cap、auth。</td>
+                <td><code>src/gateway/protocol/schema/frames.ts:20</code>、<code>src/gateway/protocol/schema/frames.ts:137</code></td>
+              </tr>
+              <tr>
+                <td>Session routing</td>
+                <td>从 channel/account/peer/guild/team/roles 决定 agentId 和 sessionKey。</td>
+                <td><code>src/routing/resolve-route.ts:610</code>、<code>src/routing/resolve-route.ts:798</code></td>
+              </tr>
+              <tr>
+                <td>Plugin boundary</td>
+                <td>manifest-first 控制面，runtime surface 通过受信 in-process API 注入。</td>
+                <td><code>src/plugins/manifest-registry.ts:399</code>、<code>src/plugins/runtime/types.ts:77</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="lifecycle" class="section">
+          <h2>请求生命周期</h2>
+          <p>
+            Gateway 的 <code>agent</code> handler 首先验证参数、caller scope、模型覆盖权限、附件、channel hint 和 idempotency。它会先返回 accepted，再后台 dispatch，并支持同一个 response id 的 final response；客户端也可以走 <code>agent.wait</code>。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/gateway/server-methods/agent.ts:553</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:610</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:653</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:484</span>
+            <span class="chip">src/gateway/protocol/schema/agent.ts:203</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>一次 agent 请求</h3>
+              <button data-open-diagram="request-lifecycle">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="request-lifecycle">
+              <div class="mermaid">
+sequenceDiagram
+  participant C as Channel/RPC Client
+  participant G as Gateway agent handler
+  participant S as Session store
+  participant A as agentCommand
+  participant R as Embedded runner
+  participant M as Model/tool loop
+  C->>G: req agent(idempotencyKey, message, session...)
+  G->>G: validate scopes, model override, attachments
+  G->>S: resolve/touch session and delivery context
+  G-->>C: accepted(runId, status=accepted)
+  G->>A: dispatchAgentRunFromGateway
+  A->>R: runWithModelFallback -> runAgentAttempt
+  R->>M: compile context, submit prompt, execute tools
+  M-->>R: assistant/tool/lifecycle events
+  R-->>A: EmbeddedPiRunResult
+  A->>S: persist transcript/session metadata
+  A-->>G: result or error
+  G-->>C: final res with same id, or agent.wait returns terminal state
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>sequenceDiagram
+  participant C as Channel/RPC Client
+  participant G as Gateway agent handler
+  participant S as Session store
+  participant A as agentCommand
+  participant R as Embedded runner
+  participant M as Model/tool loop
+  C-&gt;&gt;G: req agent(idempotencyKey, message, session...)
+  G-&gt;&gt;G: validate scopes, model override, attachments
+  G-&gt;&gt;S: resolve/touch session and delivery context
+  G--&gt;&gt;C: accepted(runId, status=accepted)
+  G-&gt;&gt;A: dispatchAgentRunFromGateway
+  A-&gt;&gt;R: runWithModelFallback -&gt; runAgentAttempt
+  R-&gt;&gt;M: compile context, submit prompt, execute tools
+  M--&gt;&gt;R: assistant/tool/lifecycle events
+  R--&gt;&gt;A: EmbeddedPiRunResult
+  A-&gt;&gt;S: persist transcript/session metadata
+  A--&gt;&gt;G: result or error
+  G--&gt;&gt;C: final res with same id, or agent.wait returns terminal state</code></pre>
+            </details>
+          </div>
+
+          <h3>Channel turn path</h3>
+          <p>
+            Channel 插件进入统一 turn kernel：ingest、classify、preflight、resolveTurn、record inbound session、dispatch reply、finalize。这个设计让 Discord、Telegram、Slack 等渠道能共享会话记录和 reply pipeline，同时保留各渠道 adapter 的差异。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/channels/turn/kernel.ts:387</span>
+            <span class="chip">src/channels/turn/kernel.ts:416</span>
+            <span class="chip">src/channels/turn/kernel.ts:455</span>
+            <span class="chip">src/channels/turn/kernel.ts:288</span>
+            <span class="chip">src/channels/session.ts:31</span>
+          </div>
+        </section>
+
+        <section id="runner" class="section">
+          <h2>Agent Runner 状态机</h2>
+          <p>
+            Runner 分两层：<code>agentCommand</code> 解析模型、provider、session、workspace、trajectory、fallback；<code>runEmbeddedPiAgent</code> 负责 session lane/global lane 排队、运行 attempt、超时/abort、compaction、fallback、事件桥接和最终结果。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/agent-command.ts:1036</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:375</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:414</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2607</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>Runner 状态机</h3>
+              <button data-open-diagram="runner-state">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="runner-state">
+              <div class="mermaid">
+stateDiagram-v2
+  [*] --> Accepted
+  Accepted --> QueuedSessionLane
+  QueuedSessionLane --> QueuedGlobalLane
+  QueuedGlobalLane --> PrepareAttempt
+  PrepareAttempt --> CompileContext
+  CompileContext --> PromptSkipped: empty prompt
+  CompileContext --> PromptSubmitted
+  PromptSubmitted --> Streaming
+  Streaming --> ToolExecuting
+  ToolExecuting --> Streaming
+  Streaming --> Compaction: context/timeout
+  Compaction --> CompileContext
+  Streaming --> Fallback: provider/model failure
+  Fallback --> PrepareAttempt
+  Streaming --> Complete
+  PromptSkipped --> Complete
+  Streaming --> Interrupted: abort/timeout/yield
+  Complete --> PersistAndDeliver
+  Interrupted --> PersistAndDeliver
+  PersistAndDeliver --> [*]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>stateDiagram-v2
+  [*] --&gt; Accepted
+  Accepted --&gt; QueuedSessionLane
+  QueuedSessionLane --&gt; QueuedGlobalLane
+  QueuedGlobalLane --&gt; PrepareAttempt
+  PrepareAttempt --&gt; CompileContext
+  CompileContext --&gt; PromptSkipped: empty prompt
+  CompileContext --&gt; PromptSubmitted
+  PromptSubmitted --&gt; Streaming
+  Streaming --&gt; ToolExecuting
+  ToolExecuting --&gt; Streaming
+  Streaming --&gt; Compaction: context/timeout
+  Compaction --&gt; CompileContext
+  Streaming --&gt; Fallback: provider/model failure
+  Fallback --&gt; PrepareAttempt
+  Streaming --&gt; Complete
+  PromptSkipped --&gt; Complete
+  Streaming --&gt; Interrupted: abort/timeout/yield
+  Complete --&gt; PersistAndDeliver
+  Interrupted --&gt; PersistAndDeliver
+  PersistAndDeliver --&gt; [*]</code></pre>
+            </details>
+          </div>
+
+          <div class="two-col">
+            <div>
+              <h3>并发模型</h3>
+              <p>
+                <code>runEmbeddedPiAgent</code> 先派生 session lane，再派生 global lane。session lane 序列化同一会话写入，global lane 控制更宽的运行队列。cron lane 有 nested lane 以避免死锁。
+              </p>
+              <div class="evidence">
+                <span class="chip">src/agents/pi-embedded-runner/lanes.ts:3</span>
+                <span class="chip">src/agents/pi-embedded-runner/lanes.ts:8</span>
+                <span class="chip">src/agents/pi-embedded-runner/run.ts:380</span>
+              </div>
+            </div>
+            <div>
+              <h3>失败恢复</h3>
+              <p>
+                执行层区分 abort、run timeout、idle timeout、tool execution timeout、compaction timeout 和 provider/model fallback。trajectory 会记录 <code>model.completed</code> 和 <code>trace.artifacts</code>，给复盘留下足够上下文。
+              </p>
+              <div class="evidence">
+                <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3966</span>
+                <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3982</span>
+                <span class="chip">docs/tools/trajectory.md</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="context" class="section">
+          <h2>上下文与记忆</h2>
+          <p>
+            OpenClaw 的上下文不是单一 prompt，而是由 workspace bootstrap 文件、system prompt config、session transcript、skills snapshot、tool schemas、附件、runtime metadata、memory/RAG 结果共同组成。系统提示词由 <code>buildAgentSystemPrompt</code> 每次重建，并把稳定前缀和动态上下文分开，便于缓存。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/system-prompt.ts</span>
+            <span class="chip">src/agents/workspace.ts</span>
+            <span class="chip">docs/concepts/context.md</span>
+            <span class="chip">docs/reference/token-use.md</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>上下文与 memory/RAG 流</h3>
+              <button data-open-diagram="context-memory">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="context-memory">
+              <div class="mermaid">
+flowchart TD
+  workspace["Workspace bootstrap files&lt;br/&gt;AGENTS / SOUL / TOOLS / IDENTITY / USER / HEARTBEAT / BOOTSTRAP / MEMORY"] --> promptBuilder["System prompt builder"]
+  session["Transcript + session entry"] --> contextEngine["Context engine"]
+  attachments["Images / media refs"] --> contextEngine
+  skills["Skill list snapshot"] --> promptBuilder
+  promptBuilder --> contextEngine
+  memoryTool["memory_search / memory_get"] --> memoryCore["memory-core plugin"]
+  memoryFiles["MEMORY.md + memory/*.md"] --> builtin["Built-in memory index"]
+  sessionCorpus["Session transcripts"] --> qmd["QMD manager&lt;br/&gt;agent-scoped XDG index"]
+  wiki["Compiled wiki supplements"] --> memoryTool
+  qmd --> memoryCore
+  builtin --> memoryCore
+  memoryCore --> recall["bounded, cited recall results"]
+  recall --> contextEngine
+  contextEngine --> prompt["Provider prompt&lt;br/&gt;system + history + tools + images"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart TD
+  workspace["Workspace bootstrap files&lt;br/&gt;AGENTS / SOUL / TOOLS / IDENTITY / USER / HEARTBEAT / BOOTSTRAP / MEMORY"] --&gt; promptBuilder["System prompt builder"]
+  session["Transcript + session entry"] --&gt; contextEngine["Context engine"]
+  attachments["Images / media refs"] --&gt; contextEngine
+  skills["Skill list snapshot"] --&gt; promptBuilder
+  promptBuilder --&gt; contextEngine
+  memoryTool["memory_search / memory_get"] --&gt; memoryCore["memory-core plugin"]
+  memoryFiles["MEMORY.md + memory/*.md"] --&gt; builtin["Built-in memory index"]
+  sessionCorpus["Session transcripts"] --&gt; qmd["QMD manager&lt;br/&gt;agent-scoped XDG index"]
+  wiki["Compiled wiki supplements"] --&gt; memoryTool
+  qmd --&gt; memoryCore
+  builtin --&gt; memoryCore
+  memoryCore --&gt; recall["bounded, cited recall results"]
+  recall --&gt; contextEngine
+  contextEngine --&gt; prompt["Provider prompt&lt;br/&gt;system + history + tools + images"]</code></pre>
+            </details>
+          </div>
+
+          <h3>Workspace 文件语义</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>文件</th>
+                <th>角色</th>
+                <th>代码证据</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AGENTS.md</code></td>
+                <td>项目/仓库级操作规则，优先影响 agent 行为。</td>
+                <td><code>src/agents/workspace.ts</code></td>
+              </tr>
+              <tr>
+                <td><code>SOUL.md</code>、<code>IDENTITY.md</code>、<code>USER.md</code></td>
+                <td>人格、身份、用户上下文。</td>
+                <td><code>src/agents/workspace.ts</code></td>
+              </tr>
+              <tr>
+                <td><code>TOOLS.md</code></td>
+                <td>本工作区工具使用约束。</td>
+                <td><code>src/agents/system-prompt.ts</code></td>
+              </tr>
+              <tr>
+                <td><code>HEARTBEAT.md</code></td>
+                <td>动态 heartbeat 上下文，低于稳定 prompt cache 边界。</td>
+                <td><code>src/agents/system-prompt.ts</code></td>
+              </tr>
+              <tr>
+                <td><code>MEMORY.md</code>、<code>memory/*.md</code></td>
+                <td>长期记忆，可通过 memory 工具检索和精读。</td>
+                <td><code>extensions/memory-core/src/tools.ts:228</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Memory/RAG 设计</h3>
+          <p>
+            <code>memory_search</code> 明确声明为 prior work、decisions、dates、people、preferences、todos 等问题的 mandatory recall step。memory-core 同时支持 memory 文件、session transcript、wiki supplement；QMD 后端按 agent 隔离 XDG config/cache，并可在 QMD 不可用或运行失败时回退到内置索引。
+          </p>
+          <div class="evidence">
+            <span class="chip">extensions/memory-core/src/tools.ts:228</span>
+            <span class="chip">extensions/memory-core/src/tools.ts:299</span>
+            <span class="chip">extensions/memory-core/src/tools.ts:359</span>
+            <span class="chip">extensions/memory-core/src/memory/search-manager.ts:148</span>
+            <span class="chip">extensions/memory-core/src/memory/search-manager.ts:403</span>
+            <span class="chip">extensions/memory-core/src/memory/qmd-manager.ts:363</span>
+          </div>
+        </section>
+
+        <section id="tools" class="section">
+          <h2>工具、权限与插件</h2>
+          <p>
+            工具层分为 core tools、coding tools、channel tools、plugin tools。runner 先根据 <code>disableTools</code>、<code>modelRun</code>、<code>toolsAllow</code> 计算工具构造计划，再由 <code>createOpenClawTools</code> 拼装消息、sessions、web、media、nodes、cron、gateway、plugin 工具，并统一包一层 <code>before_tool_call</code> hook。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt-tool-construction-plan.ts:147</span>
+            <span class="chip">src/agents/openclaw-tools.ts:71</span>
+            <span class="chip">src/agents/openclaw-tools.ts:402</span>
+            <span class="chip">src/agents/openclaw-tools.ts:470</span>
+            <span class="chip">docs/tools/exec-approvals.md</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>工具和插件执行流</h3>
+              <button data-open-diagram="tools-flow">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="tools-flow">
+              <div class="mermaid">
+flowchart LR
+  runner["Runner attempt"] --> plan["Tool construction plan"]
+  plan --> core["Core tools"]
+  plan --> policy["allow/deny + groups"]
+  plan --> pluginContracts["Plugin manifest contracts"]
+  pluginContracts --> registry["Runtime plugin registry"]
+  registry --> factories["Tool factories"]
+  factories --> guard["malformed / undeclared / conflict guards"]
+  core --> hook["before_tool_call hook"]
+  guard --> hook
+  hook --> exec["Tool execution"]
+  exec --> approvals["exec/plugin approvals when required"]
+  exec --> host["files / shell / web / media / channels"]
+  exec --> results["tool events + transcript results"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart LR
+  runner["Runner attempt"] --&gt; plan["Tool construction plan"]
+  plan --&gt; core["Core tools"]
+  plan --&gt; policy["allow/deny + groups"]
+  plan --&gt; pluginContracts["Plugin manifest contracts"]
+  pluginContracts --&gt; registry["Runtime plugin registry"]
+  registry --&gt; factories["Tool factories"]
+  factories --&gt; guard["malformed / undeclared / conflict guards"]
+  core --&gt; hook["before_tool_call hook"]
+  guard --&gt; hook
+  hook --&gt; exec["Tool execution"]
+  exec --&gt; approvals["exec/plugin approvals when required"]
+  exec --&gt; host["files / shell / web / media / channels"]
+  exec --&gt; results["tool events + transcript results"]</code></pre>
+            </details>
+          </div>
+
+          <h3>插件控制面</h3>
+          <p>
+            manifest registry 抽取插件 id、kind、channels、providers、model catalog、tool metadata、config schema、contracts 等静态元数据。runtime load context 会先应用 auto-enable，再决定 workspace、env、activationSourceConfig。工具注册时会过滤 denylist、optional allowlist、manifest availability，并拒绝 malformed、undeclared、name conflict 的插件工具。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/plugins/manifest-registry.ts:399</span>
+            <span class="chip">src/plugins/runtime/load-context.ts:46</span>
+            <span class="chip">src/plugins/runtime/runtime-registry-loader.ts:123</span>
+            <span class="chip">src/plugins/tools.ts:1113</span>
+            <span class="chip">src/plugins/tools.ts:1144</span>
+          </div>
+        </section>
+
+        <section id="multi-agent" class="section">
+          <h2>多 Agent 协作</h2>
+          <p>
+            多 agent 不是简单的函数调用，而是 session 和 task 层面的拓扑：父会话通过 <code>sessions_spawn</code> 创建 subagent 或 ACP session；子任务拥有自己的 sessionKey、transcript 和生命周期；完成后通过 internal event 或 message 回到父会话。插件 runtime 也可以拿到 subagent runtime surface。
+          </p>
+          <div class="evidence">
+            <span class="chip">docs/tools/subagents.md</span>
+            <span class="chip">docs/tools/acp-agents.md</span>
+            <span class="chip">src/agents/tools/sessions-spawn-tool.ts:245</span>
+            <span class="chip">src/agents/tools/sessions-spawn-tool.ts:292</span>
+            <span class="chip">src/plugins/runtime/types.ts:79</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>多 Agent 拓扑与控制/执行面</h3>
+              <button data-open-diagram="multi-agent-topology">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="multi-agent-topology">
+              <div class="mermaid">
+flowchart TB
+  parent["Parent session"] --> spawn["sessions_spawn / subagents"]
+  spawn --> sub["Subagent session&lt;br/&gt;agent:id:subagent:uuid"]
+  spawn --> acp["ACP runtime session"]
+  parent --> wait["sessions_yield / agent.wait"]
+  sub --> announce["task completion internal event"]
+  acp --> announce
+  announce --> gateway["Gateway"]
+  gateway --> parent
+  plugin["Native plugin runtime"] --> surface["Injected runtime&lt;br/&gt;agent / nodes / channel / llm / tasks"]
+  surface --> sub
+  gateway -. control plane .-> store["Session/task registry"]
+  sub -. execution plane .-> runner["Embedded runner"]
+  acp -. external harness .-> external["External ACP agent"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart TB
+  parent["Parent session"] --&gt; spawn["sessions_spawn / subagents"]
+  spawn --&gt; sub["Subagent session&lt;br/&gt;agent:id:subagent:uuid"]
+  spawn --&gt; acp["ACP runtime session"]
+  parent --&gt; wait["sessions_yield / agent.wait"]
+  sub --&gt; announce["task completion internal event"]
+  acp --&gt; announce
+  announce --&gt; gateway["Gateway"]
+  gateway --&gt; parent
+  plugin["Native plugin runtime"] --&gt; surface["Injected runtime&lt;br/&gt;agent / nodes / channel / llm / tasks"]
+  surface --&gt; sub
+  gateway -. control plane .-&gt; store["Session/task registry"]
+  sub -. execution plane .-&gt; runner["Embedded runner"]
+  acp -. external harness .-&gt; external["External ACP agent"]</code></pre>
+            </details>
+          </div>
+        </section>
+
+        <section id="observability" class="section">
+          <h2>可观测性</h2>
+          <p>
+            项目有明确的 trajectory flight recorder：运行开始记录 <code>session.started</code> 和 <code>trace.metadata</code>，上下文提交前记录 <code>context.compiled</code>，prompt 提交记录 <code>prompt.submitted</code>，结束记录 <code>model.completed</code>、<code>trace.artifacts</code>、<code>session.ended</code>。这让一次 agent turn 可以从 prompt、工具、usage、compaction、fallback 和 transcript 多维度复盘。
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2014</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2026</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3263</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3477</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3966</span>
+            <span class="chip">docs/tools/trajectory.md</span>
+          </div>
+          <p>
+            这套可观测性对 agent 系统很关键：LLM 错误往往不是单点 bug，而是上下文、工具、模型、权限、记忆、渠道投递共同造成的系统行为。trajectory 把这些因素压成可导出的证据包。
+          </p>
+        </section>
+
+        <section id="judgment" class="section">
+          <h2>设计判断</h2>
+          <h3>做得强的地方</h3>
+          <ul>
+            <li>Gateway 和 runner 分层清楚：控制面负责协议、会话和任务，执行面负责模型/工具循环。</li>
+            <li>sessionKey 是系统主轴：路由、delivery、memory 可见性、subagent、transcript 都围绕它组织。</li>
+            <li>插件是 ownership boundary：manifest 提供静态元数据，runtime surface 提供受信能力，工具层有契约校验。</li>
+            <li>长任务有工程化处理：accepted ack、agent.wait、runId、dedupe、queue lanes、timeout、fallback、trajectory。</li>
+            <li>上下文设计考虑成本和可缓存性：稳定系统 prompt 前缀、动态 heartbeat、tool search compact、memory bounded result。</li>
+          </ul>
+
+          <h3>复杂度集中点</h3>
+          <ul>
+            <li>热路径不能随意 broad load plugin/provider/channel registry；项目已有大量 AGENTS 规则在约束这个方向。</li>
+            <li>会话生命周期和 delivery context 很容易产生跨渠道错误，需要严格依赖 prepared runtime facts 和 last route。</li>
+            <li>插件是 in-process trusted native runtime，不是强沙箱；安全边界主要靠配置、权限、approval 和契约校验。</li>
+            <li>memory 有多后端、多语料、多 visibility 规则；检索质量、延迟和 fallback 都需要 live proof 才能断言。</li>
+          </ul>
+
+          <h3>面试式解释</h3>
+          <p>
+            可以把 OpenClaw 解释成“Slack/Telegram/Discord/本地客户端共享的 agent OS”。Gateway 类似内核控制面，session store 是进程表和文件系统索引，plugin manifest 是设备树，runner 是执行调度器，tools 是系统调用，memory/RAG 是可查询的长期状态。它的工程重点是把 LLM 的不确定性包在确定性的协议、队列、权限、会话和审计结构里。
+          </p>
+        </section>
+
+        <section id="reading-path" class="section">
+          <h2>建议阅读路径</h2>
+          <ol>
+            <li><code>docs/concepts/architecture.md</code>：先看 Gateway 和 WebSocket 控制面。</li>
+            <li><code>docs/concepts/agent-loop.md</code>：理解 agent RPC 到 runner 的完整 turn。</li>
+            <li><code>src/gateway/server-methods/agent.ts</code>：看 accepted ack、dedupe、session reset、dispatch。</li>
+            <li><code>src/agents/agent-command.ts</code>：看模型/provider/session/workspace/fallback 总编排。</li>
+            <li><code>src/agents/pi-embedded-runner/run.ts</code> 与 <code>src/agents/pi-embedded-runner/run/attempt.ts</code>：看真正的执行循环。</li>
+            <li><code>src/agents/system-prompt.ts</code> 与 <code>src/agents/workspace.ts</code>：看上下文如何进入模型。</li>
+            <li><code>src/agents/openclaw-tools.ts</code>、<code>src/plugins/tools.ts</code>：看工具和插件工具边界。</li>
+            <li><code>extensions/memory-core/src/tools.ts</code> 与 <code>extensions/memory-core/src/memory/search-manager.ts</code>：看 memory/RAG。</li>
+            <li><code>docs/tools/subagents.md</code>、<code>src/agents/tools/sessions-spawn-tool.ts</code>：看多 agent。</li>
+          </ol>
+        </section>
+
+        <section id="glossary" class="section">
+          <h2>术语表</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>术语</th>
+                <th>含义</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Gateway</td>
+                <td>OpenClaw 长驻控制面，处理协议、鉴权、会话、事件、任务和渠道桥接。</td>
+              </tr>
+              <tr>
+                <td>SessionKey</td>
+                <td>会话定位键，连接 agentId、channel、account、peer、subagent 等上下文。</td>
+              </tr>
+              <tr>
+                <td>Embedded Pi runner</td>
+                <td>默认 agent 执行器，负责编译上下文、调模型、执行工具、处理 compaction/fallback。</td>
+              </tr>
+              <tr>
+                <td>ACP</td>
+                <td>外部 agent harness 协议路径，可由 <code>sessions_spawn({runtime:"acp"})</code> 使用。</td>
+              </tr>
+              <tr>
+                <td>Manifest-first plugins</td>
+                <td>插件先通过 manifest 暴露能力、契约、配置和元数据，runtime 只在需要时加载。</td>
+              </tr>
+              <tr>
+                <td>Trajectory</td>
+                <td>一次 agent turn 的可导出运行记录，包含上下文、prompt、工具、usage、artifact 和终态。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="unknowns" class="section">
+          <h2>待验证点</h2>
+          <div class="callout warn">
+            本报告是静态架构分析，已经跑过文档索引和源码 inventory，但没有启动本地 Gateway 做 live turn。
+          </div>
+          <ul>
+            <li>模型/provider 行为需要用真实凭据跑一次 <code>agent</code> + <code>agent.wait</code> 才能确认端到端延迟、fallback 和 usage。</li>
+            <li>memory/RAG 质量需要按实际 QMD 安装、索引状态和 workspace memory 文件做 live query。</li>
+            <li>渠道投递需要按具体渠道插件验证 last route、threadId、quoted reply、media upload 的当前行为。</li>
+            <li>如果要改代码，验证门槛应按 touched surface 选择 targeted tests、<code>corepack pnpm check:changed</code> 或 Testbox。</li>
+          </ul>
+        </section>
+
+        <p class="footer-note">
+          生成位置：<code>agent-codebase-analysis/agent-architecture-analysis.html</code>。图表使用 Mermaid 渲染；若离线打开时 CDN 不可用，报告内仍保留每张图的 Mermaid source。
+        </p>
+      </main>
+    </div>
+
+    <div class="modal" id="diagram-modal" aria-hidden="true">
+      <div class="modal-panel">
+        <div class="modal-top">
+          <div class="modal-title" id="modal-title">Diagram</div>
+          <button id="modal-close">Close</button>
+        </div>
+        <div class="modal-content" id="modal-content"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "loose",
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e8f4f8",
+          primaryTextColor: "#172033",
+          primaryBorderColor: "#9bbdcc",
+          lineColor: "#6c7a8b",
+          secondaryColor: "#f6eee8",
+          tertiaryColor: "#ffffff",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+
+      const modal = document.getElementById("diagram-modal");
+      const modalContent = document.getElementById("modal-content");
+      const modalTitle = document.getElementById("modal-title");
+      const closeButton = document.getElementById("modal-close");
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        modalContent.innerHTML = "";
+      }
+
+      document.querySelectorAll("[data-open-diagram]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.getAttribute("data-open-diagram");
+          const source = id ? document.getElementById(id) : null;
+          if (!source) return;
+          const title = button.closest(".diagram-card")?.querySelector("h3")?.textContent ?? "Diagram";
+          modalTitle.textContent = title;
+          modalContent.innerHTML = source.innerHTML;
+          modal.classList.add("open");
+          modal.setAttribute("aria-hidden", "false");
+        });
+      });
+
+      closeButton.addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeModal();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Agent Architecture Analysis</title>
+    <style>
+      :root {
+        --bg: #f7f8fb;
+        --panel: #ffffff;
+        --ink: #172033;
+        --muted: #647084;
+        --line: #d8dee8;
+        --accent: #1b6b8f;
+        --accent-2: #8a4a21;
+        --soft: #e8f4f8;
+        --soft-2: #f6eee8;
+        --code: #102030;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        line-height: 1.55;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 100vh; }
+      aside {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: #fff;
+        padding: 28px 24px;
+      }
+      main { padding: 40px; max-width: 1280px; }
+      h1, h2, h3 { letter-spacing: 0; line-height: 1.18; }
+      h1 { margin: 0 0 12px; font-size: 34px; }
+      h2 { margin: 42px 0 16px; padding-top: 8px; font-size: 26px; }
+      h3 { margin: 24px 0 10px; font-size: 18px; }
+      p { margin: 0 0 14px; }
+      code {
+        padding: 2px 5px;
+        border: 1px solid #dce4ee;
+        border-radius: 5px;
+        background: #f2f5f8;
+        color: var(--code);
+        font-size: 0.92em;
+      }
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f5f7fa;
+      }
+      table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; background: #fff; }
+      th, td { padding: 10px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: #eef3f8; }
+      .kicker { margin-bottom: 6px; color: var(--accent-2); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+      .subtitle { max-width: 900px; color: var(--muted); font-size: 17px; }
+      .toc-title { margin: 0 0 12px; font-weight: 800; }
+      .toc { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+      .toc a { display: block; padding: 7px 9px; border-radius: 7px; color: #26364c; }
+      .toc a:hover { background: var(--soft); text-decoration: none; }
+      .meta { display: grid; gap: 8px; margin-top: 24px; color: var(--muted); font-size: 13px; }
+      .hero, .section, .callout, .diagram-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+      .hero { padding: 28px; }
+      .section { padding: 24px; margin-top: 18px; }
+      .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+      .metric { padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+      .metric strong { display: block; margin-bottom: 6px; font-size: 20px; }
+      .metric span { color: var(--muted); }
+      .callout { padding: 16px 18px; margin: 18px 0; background: var(--soft); }
+      .callout.warn { background: var(--soft-2); }
+      .evidence { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        padding: 3px 8px;
+        border: 1px solid #cdd7e3;
+        border-radius: 999px;
+        background: #fff;
+        color: #334258;
+        font-size: 12px;
+      }
+      .diagram-card { margin: 18px 0 24px; overflow: hidden; }
+      .diagram-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: #f7fafc;
+      }
+      .diagram-head h3 { margin: 0; }
+      button {
+        border: 1px solid #b8c6d4;
+        border-radius: 7px;
+        background: #fff;
+        color: #223149;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+      }
+      button:hover { background: #eef4f9; }
+      .diagram-surface { padding: 18px; overflow: auto; }
+      .mermaid { min-width: 680px; }
+      details { border-top: 1px solid var(--line); background: #fbfcfe; }
+      summary { cursor: pointer; padding: 10px 16px; color: var(--muted); }
+      details pre { margin: 0 16px 16px; }
+      .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+      .modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(12, 22, 38, 0.68); padding: 26px; }
+      .modal.open { display: block; }
+      .modal-panel { height: 100%; overflow: auto; border-radius: 8px; background: #fff; padding: 18px; }
+      .modal-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
+      .modal-title { font-weight: 800; }
+      .modal-content { transform-origin: top left; min-width: 900px; }
+      .footer-note { margin-top: 40px; color: var(--muted); font-size: 13px; }
+      @media (max-width: 960px) {
+        .layout { grid-template-columns: 1fr; }
+        aside { position: relative; height: auto; }
+        main { padding: 24px; }
+        .grid, .two-col { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside>
+        <div class="toc-title">OpenClaw Analysis</div>
+        <ol class="toc">
+          <li><a href="#summary">Executive Summary</a></li>
+          <li><a href="#boundary">System Boundary</a></li>
+          <li><a href="#lifecycle">Request Lifecycle</a></li>
+          <li><a href="#runner">Agent Runner</a></li>
+          <li><a href="#context">Context And Memory</a></li>
+          <li><a href="#tools">Tools And Plugins</a></li>
+          <li><a href="#multi-agent">Multi-Agent Design</a></li>
+          <li><a href="#observability">Observability</a></li>
+          <li><a href="#judgment">Design Judgment</a></li>
+          <li><a href="#reading-path">Reading Path</a></li>
+          <li><a href="#terminology-glossary">Glossary</a></li>
+          <li><a href="#unknowns">Unknowns</a></li>
+        </ol>
+        <div class="meta">
+          <div>Evidence: local source, project docs, inventory.</div>
+          <div>Docs index: <code>corepack pnpm docs:list</code></div>
+          <div>Inventory file count: <code>17019</code></div>
+        </div>
+      </aside>
+
+      <main>
+        <section id="summary" class="hero">
+          <div class="kicker">Architecture Report</div>
+          <h1>OpenClaw Project Analysis</h1>
+          <p class="subtitle">
+            OpenClaw is a local-first multi-channel AI Gateway and agent runtime. It is not just an LLM chat wrapper: it combines messaging entry points, session routing, model execution, tool execution, plugin capabilities, memory retrieval, background tasks, and a typed multi-client protocol into one control plane.
+          </p>
+        </section>
+
+        <section class="section">
+          <h2>Core Thesis</h2>
+          <div class="grid">
+            <div class="metric">
+              <strong>Agent Type</strong>
+              <span>A local Gateway-orchestrated personal agent for tools, long-running work, and plugins.</span>
+            </div>
+            <div class="metric">
+              <strong>Control Plane</strong>
+              <span>The Gateway owns WebSocket RPC, auth, sessions, routing, task state, and events.</span>
+            </div>
+            <div class="metric">
+              <strong>Execution Plane</strong>
+              <span>Embedded Pi runner, ACP harnesses, subagents, model providers, and tools do the work.</span>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Architecture judgment:</strong>
+            The hard part of OpenClaw is not calling a model. The hard part is keeping multi-channel, multi-provider, multi-plugin, multi-session, long-running agent work lazy, auditable, permissioned, and recoverable.
+          </div>
+          <p>
+            The main path is: a client or channel sends a request to the Gateway; the Gateway validates permissions, resolves the session, and accepts a run; a background task enters <code>agentCommand</code>; the embedded Pi runner compiles system prompt, history, attachments, tool schemas, and memory results; the model/tool loop runs; then transcript, events, trajectory, and delivery state are written back through the Gateway control plane.
+          </p>
+          <div class="evidence">
+            <span class="chip">docs/concepts/architecture.md</span>
+            <span class="chip">docs/concepts/agent-loop.md</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:553</span>
+            <span class="chip">src/agents/agent-command.ts:1036</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:361</span>
+          </div>
+        </section>
+
+        <section id="boundary" class="section">
+          <h2>System Boundary</h2>
+          <p>
+            The Gateway is the long-lived system boundary. It accepts WebSocket protocol frames, channel messages, CLI/mobile/desktop requests, and node presence. The agent runner does not own the outside world directly; it reaches channels, files, web, media, and plugin capabilities through Gateway-mediated tools and runtime surfaces.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/gateway/protocol/schema/frames.ts:137</span>
+            <span class="chip">src/gateway/protocol/schema/frames.ts:158</span>
+            <span class="chip">src/plugins/runtime/types.ts:77</span>
+            <span class="chip">src/plugins/runtime/index.ts:24</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>System Boundary</h3>
+              <button data-open-diagram="system-boundary">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="system-boundary">
+              <div class="mermaid">
+flowchart LR
+  user["Human user / external event"] --> channels["Channel plugins&lt;br/&gt;Telegram / Discord / Slack / Web / Mobile"]
+  clients["CLI / Desktop / Mobile / Nodes"] --> gateway["OpenClaw Gateway&lt;br/&gt;RPC, auth, sessions, events"]
+  channels --> gateway
+  gateway --> store["Session store&lt;br/&gt;sessions.json + transcripts"]
+  gateway --> agent["agentCommand&lt;br/&gt;model and runtime resolution"]
+  agent --> runner["Execution plane&lt;br/&gt;Embedded Pi runner / ACP"]
+  runner --> model["LLM providers&lt;br/&gt;OpenAI / Anthropic / Google / local"]
+  runner --> tools["Core tools + plugin tools"]
+  tools --> host["Host OS / Web / Media / Channels"]
+  runner --> memory["Memory/RAG plugins"]
+  gateway --> events["agent/chat/presence/health/cron events"]
+  events --> clients
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart LR
+  user["Human user / external event"] --&gt; channels["Channel plugins&lt;br/&gt;Telegram / Discord / Slack / Web / Mobile"]
+  clients["CLI / Desktop / Mobile / Nodes"] --&gt; gateway["OpenClaw Gateway&lt;br/&gt;RPC, auth, sessions, events"]
+  channels --&gt; gateway
+  gateway --&gt; store["Session store&lt;br/&gt;sessions.json + transcripts"]
+  gateway --&gt; agent["agentCommand&lt;br/&gt;model and runtime resolution"]
+  agent --&gt; runner["Execution plane&lt;br/&gt;Embedded Pi runner / ACP"]
+  runner --&gt; model["LLM providers&lt;br/&gt;OpenAI / Anthropic / Google / local"]
+  runner --&gt; tools["Core tools + plugin tools"]
+  tools --&gt; host["Host OS / Web / Media / Channels"]
+  runner --&gt; memory["Memory/RAG plugins"]
+  gateway --&gt; events["agent/chat/presence/health/cron events"]
+  events --&gt; clients</code></pre>
+            </details>
+          </div>
+
+          <h3>Boundary Details</h3>
+          <table>
+            <thead>
+              <tr><th>Boundary</th><th>Responsibility</th><th>Evidence</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Gateway protocol</td>
+                <td>Top-level <code>req</code>, <code>res</code>, and <code>event</code> frames; connection params include protocol range, client, caps, and auth.</td>
+                <td><code>src/gateway/protocol/schema/frames.ts:20</code>, <code>src/gateway/protocol/schema/frames.ts:137</code></td>
+              </tr>
+              <tr>
+                <td>Session routing</td>
+                <td>Derives agentId and sessionKey from channel, account, peer, guild, team, and roles.</td>
+                <td><code>src/routing/resolve-route.ts:610</code>, <code>src/routing/resolve-route.ts:798</code></td>
+              </tr>
+              <tr>
+                <td>Plugin boundary</td>
+                <td>Static manifest-first control plane plus trusted in-process runtime APIs.</td>
+                <td><code>src/plugins/manifest-registry.ts:399</code>, <code>src/plugins/runtime/types.ts:77</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="lifecycle" class="section">
+          <h2>Request Lifecycle</h2>
+          <p>
+            The Gateway <code>agent</code> handler validates params, caller scope, model override authority, attachments, channel hints, and idempotency. It returns an accepted run first, dispatches the real work in the background, and supports a final response with the same response id. Clients can also wait through <code>agent.wait</code>.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/gateway/server-methods/agent.ts:553</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:610</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:653</span>
+            <span class="chip">src/gateway/server-methods/agent.ts:484</span>
+            <span class="chip">src/gateway/protocol/schema/agent.ts:203</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>One Agent Request</h3>
+              <button data-open-diagram="request-lifecycle">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="request-lifecycle">
+              <div class="mermaid">
+sequenceDiagram
+  participant C as Channel/RPC Client
+  participant G as Gateway agent handler
+  participant S as Session store
+  participant A as agentCommand
+  participant R as Embedded runner
+  participant M as Model/tool loop
+  C->>G: req agent(idempotencyKey, message, session...)
+  G->>G: validate scopes, model override, attachments
+  G->>S: resolve/touch session and delivery context
+  G-->>C: accepted(runId, status=accepted)
+  G->>A: dispatchAgentRunFromGateway
+  A->>R: runWithModelFallback -> runAgentAttempt
+  R->>M: compile context, submit prompt, execute tools
+  M-->>R: assistant/tool/lifecycle events
+  R-->>A: EmbeddedPiRunResult
+  A->>S: persist transcript/session metadata
+  A-->>G: result or error
+  G-->>C: final res with same id, or agent.wait returns terminal state
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>sequenceDiagram
+  participant C as Channel/RPC Client
+  participant G as Gateway agent handler
+  participant S as Session store
+  participant A as agentCommand
+  participant R as Embedded runner
+  participant M as Model/tool loop
+  C-&gt;&gt;G: req agent(idempotencyKey, message, session...)
+  G-&gt;&gt;G: validate scopes, model override, attachments
+  G-&gt;&gt;S: resolve/touch session and delivery context
+  G--&gt;&gt;C: accepted(runId, status=accepted)
+  G-&gt;&gt;A: dispatchAgentRunFromGateway
+  A-&gt;&gt;R: runWithModelFallback -&gt; runAgentAttempt
+  R-&gt;&gt;M: compile context, submit prompt, execute tools
+  M--&gt;&gt;R: assistant/tool/lifecycle events
+  R--&gt;&gt;A: EmbeddedPiRunResult
+  A-&gt;&gt;S: persist transcript/session metadata
+  A--&gt;&gt;G: result or error
+  G--&gt;&gt;C: final res with same id, or agent.wait returns terminal state</code></pre>
+            </details>
+          </div>
+
+          <h3>Channel Turn Path</h3>
+          <p>
+            Channel plugins enter a shared turn kernel: ingest, classify, preflight, resolveTurn, record inbound session, dispatch reply, and finalize. This lets Discord, Telegram, Slack, and other channels share session recording and reply mechanics while retaining channel-specific adapters.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/channels/turn/kernel.ts:387</span>
+            <span class="chip">src/channels/turn/kernel.ts:416</span>
+            <span class="chip">src/channels/turn/kernel.ts:455</span>
+            <span class="chip">src/channels/turn/kernel.ts:288</span>
+            <span class="chip">src/channels/session.ts:31</span>
+          </div>
+        </section>
+
+        <section id="runner" class="section">
+          <h2>Agent Runner</h2>
+          <p>
+            The runner has two layers. <code>agentCommand</code> resolves model, provider, session, workspace, trajectory, and fallback. <code>runEmbeddedPiAgent</code> handles session/global lane queueing, attempts, timeout/abort, compaction, fallback, event bridging, and final result assembly.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/agent-command.ts:1036</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:375</span>
+            <span class="chip">src/agents/pi-embedded-runner/run.ts:414</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2607</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>Runner State Machine</h3>
+              <button data-open-diagram="runner-state">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="runner-state">
+              <div class="mermaid">
+stateDiagram-v2
+  [*] --> Accepted
+  Accepted --> QueuedSessionLane
+  QueuedSessionLane --> QueuedGlobalLane
+  QueuedGlobalLane --> PrepareAttempt
+  PrepareAttempt --> CompileContext
+  CompileContext --> PromptSkipped: empty prompt
+  CompileContext --> PromptSubmitted
+  PromptSubmitted --> Streaming
+  Streaming --> ToolExecuting
+  ToolExecuting --> Streaming
+  Streaming --> Compaction: context/timeout
+  Compaction --> CompileContext
+  Streaming --> Fallback: provider/model failure
+  Fallback --> PrepareAttempt
+  Streaming --> Complete
+  PromptSkipped --> Complete
+  Streaming --> Interrupted: abort/timeout/yield
+  Complete --> PersistAndDeliver
+  Interrupted --> PersistAndDeliver
+  PersistAndDeliver --> [*]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>stateDiagram-v2
+  [*] --&gt; Accepted
+  Accepted --&gt; QueuedSessionLane
+  QueuedSessionLane --&gt; QueuedGlobalLane
+  QueuedGlobalLane --&gt; PrepareAttempt
+  PrepareAttempt --&gt; CompileContext
+  CompileContext --&gt; PromptSkipped: empty prompt
+  CompileContext --&gt; PromptSubmitted
+  PromptSubmitted --&gt; Streaming
+  Streaming --&gt; ToolExecuting
+  ToolExecuting --&gt; Streaming
+  Streaming --&gt; Compaction: context/timeout
+  Compaction --&gt; CompileContext
+  Streaming --&gt; Fallback: provider/model failure
+  Fallback --&gt; PrepareAttempt
+  Streaming --&gt; Complete
+  PromptSkipped --&gt; Complete
+  Streaming --&gt; Interrupted: abort/timeout/yield
+  Complete --&gt; PersistAndDeliver
+  Interrupted --&gt; PersistAndDeliver
+  PersistAndDeliver --&gt; [*]</code></pre>
+            </details>
+          </div>
+
+          <div class="two-col">
+            <div>
+              <h3>Concurrency Model</h3>
+              <p>
+                <code>runEmbeddedPiAgent</code> derives a session lane and a global lane. The session lane serializes writes for one conversation; the global lane limits broader runtime work. Cron gets a nested lane to avoid deadlocks.
+              </p>
+              <div class="evidence">
+                <span class="chip">src/agents/pi-embedded-runner/lanes.ts:3</span>
+                <span class="chip">src/agents/pi-embedded-runner/lanes.ts:8</span>
+                <span class="chip">src/agents/pi-embedded-runner/run.ts:380</span>
+              </div>
+            </div>
+            <div>
+              <h3>Failure Recovery</h3>
+              <p>
+                The execution layer distinguishes aborts, run timeouts, idle timeouts, tool execution timeouts, compaction timeouts, and provider/model fallback. Trajectory records <code>model.completed</code> and <code>trace.artifacts</code> for later inspection.
+              </p>
+              <div class="evidence">
+                <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3966</span>
+                <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3982</span>
+                <span class="chip">docs/tools/trajectory.md</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="context" class="section">
+          <h2>Context And Memory</h2>
+          <p>
+            OpenClaw context is not a single prompt string. It is assembled from workspace bootstrap files, system prompt config, session transcript, skill snapshots, tool schemas, attachments, runtime metadata, and memory/RAG results. <code>buildAgentSystemPrompt</code> rebuilds the system prompt per run and separates stable prefix content from dynamic context for caching.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/system-prompt.ts</span>
+            <span class="chip">src/agents/workspace.ts</span>
+            <span class="chip">docs/concepts/context.md</span>
+            <span class="chip">docs/reference/token-use.md</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>Context And Memory Flow</h3>
+              <button data-open-diagram="context-memory">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="context-memory">
+              <div class="mermaid">
+flowchart TD
+  workspace["Workspace bootstrap files&lt;br/&gt;AGENTS / SOUL / TOOLS / IDENTITY / USER / HEARTBEAT / BOOTSTRAP / MEMORY"] --> promptBuilder["System prompt builder"]
+  session["Transcript + session entry"] --> contextEngine["Context engine"]
+  attachments["Images / media refs"] --> contextEngine
+  skills["Skill list snapshot"] --> promptBuilder
+  promptBuilder --> contextEngine
+  memoryTool["memory_search / memory_get"] --> memoryCore["memory-core plugin"]
+  memoryFiles["MEMORY.md + memory/*.md"] --> builtin["Built-in memory index"]
+  sessionCorpus["Session transcripts"] --> qmd["QMD manager&lt;br/&gt;agent-scoped XDG index"]
+  wiki["Compiled wiki supplements"] --> memoryTool
+  qmd --> memoryCore
+  builtin --> memoryCore
+  memoryCore --> recall["bounded, cited recall results"]
+  recall --> contextEngine
+  contextEngine --> prompt["Provider prompt&lt;br/&gt;system + history + tools + images"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart TD
+  workspace["Workspace bootstrap files&lt;br/&gt;AGENTS / SOUL / TOOLS / IDENTITY / USER / HEARTBEAT / BOOTSTRAP / MEMORY"] --&gt; promptBuilder["System prompt builder"]
+  session["Transcript + session entry"] --&gt; contextEngine["Context engine"]
+  attachments["Images / media refs"] --&gt; contextEngine
+  skills["Skill list snapshot"] --&gt; promptBuilder
+  promptBuilder --&gt; contextEngine
+  memoryTool["memory_search / memory_get"] --&gt; memoryCore["memory-core plugin"]
+  memoryFiles["MEMORY.md + memory/*.md"] --&gt; builtin["Built-in memory index"]
+  sessionCorpus["Session transcripts"] --&gt; qmd["QMD manager&lt;br/&gt;agent-scoped XDG index"]
+  wiki["Compiled wiki supplements"] --&gt; memoryTool
+  qmd --&gt; memoryCore
+  builtin --&gt; memoryCore
+  memoryCore --&gt; recall["bounded, cited recall results"]
+  recall --&gt; contextEngine
+  contextEngine --&gt; prompt["Provider prompt&lt;br/&gt;system + history + tools + images"]</code></pre>
+            </details>
+          </div>
+
+          <h3>Workspace File Semantics</h3>
+          <table>
+            <thead><tr><th>File</th><th>Role</th><th>Evidence</th></tr></thead>
+            <tbody>
+              <tr><td><code>AGENTS.md</code></td><td>Project or repository operating rules that strongly shape agent behavior.</td><td><code>src/agents/workspace.ts</code></td></tr>
+              <tr><td><code>SOUL.md</code>, <code>IDENTITY.md</code>, <code>USER.md</code></td><td>Persona, identity, and user-specific context.</td><td><code>src/agents/workspace.ts</code></td></tr>
+              <tr><td><code>TOOLS.md</code></td><td>Workspace-specific tool constraints.</td><td><code>src/agents/system-prompt.ts</code></td></tr>
+              <tr><td><code>HEARTBEAT.md</code></td><td>Dynamic heartbeat context below the stable prompt cache boundary.</td><td><code>src/agents/system-prompt.ts</code></td></tr>
+              <tr><td><code>MEMORY.md</code>, <code>memory/*.md</code></td><td>Long-term memory that can be searched and read by memory tools.</td><td><code>extensions/memory-core/src/tools.ts:228</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Memory/RAG Design</h3>
+          <p>
+            <code>memory_search</code> declares itself as a mandatory recall step before answering questions about prior work, decisions, dates, people, preferences, or todos. The memory-core plugin can search memory files, session transcripts, and wiki supplements. The QMD backend uses agent-scoped XDG state and can fall back to the built-in index when unavailable or when it fails.
+          </p>
+          <div class="evidence">
+            <span class="chip">extensions/memory-core/src/tools.ts:228</span>
+            <span class="chip">extensions/memory-core/src/tools.ts:299</span>
+            <span class="chip">extensions/memory-core/src/tools.ts:359</span>
+            <span class="chip">extensions/memory-core/src/memory/search-manager.ts:148</span>
+            <span class="chip">extensions/memory-core/src/memory/search-manager.ts:403</span>
+            <span class="chip">extensions/memory-core/src/memory/qmd-manager.ts:363</span>
+          </div>
+        </section>
+
+        <section id="tools" class="section">
+          <h2>Tools, Permissions, And Plugins</h2>
+          <p>
+            The tool layer includes core tools, coding tools, channel tools, and plugin tools. The runner first computes a tool construction plan from <code>disableTools</code>, <code>modelRun</code>, and <code>toolsAllow</code>. <code>createOpenClawTools</code> then assembles message, sessions, web, media, nodes, cron, Gateway, and plugin tools, and wraps returned tools in a <code>before_tool_call</code> hook by default.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt-tool-construction-plan.ts:147</span>
+            <span class="chip">src/agents/openclaw-tools.ts:71</span>
+            <span class="chip">src/agents/openclaw-tools.ts:402</span>
+            <span class="chip">src/agents/openclaw-tools.ts:470</span>
+            <span class="chip">docs/tools/exec-approvals.md</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>Tool And Plugin Execution Flow</h3>
+              <button data-open-diagram="tools-flow">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="tools-flow">
+              <div class="mermaid">
+flowchart LR
+  runner["Runner attempt"] --> plan["Tool construction plan"]
+  plan --> core["Core tools"]
+  plan --> policy["allow/deny + groups"]
+  plan --> pluginContracts["Plugin manifest contracts"]
+  pluginContracts --> registry["Runtime plugin registry"]
+  registry --> factories["Tool factories"]
+  factories --> guard["malformed / undeclared / conflict guards"]
+  core --> hook["before_tool_call hook"]
+  guard --> hook
+  hook --> exec["Tool execution"]
+  exec --> approvals["exec/plugin approvals when required"]
+  exec --> host["files / shell / web / media / channels"]
+  exec --> results["tool events + transcript results"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart LR
+  runner["Runner attempt"] --&gt; plan["Tool construction plan"]
+  plan --&gt; core["Core tools"]
+  plan --&gt; policy["allow/deny + groups"]
+  plan --&gt; pluginContracts["Plugin manifest contracts"]
+  pluginContracts --&gt; registry["Runtime plugin registry"]
+  registry --&gt; factories["Tool factories"]
+  factories --&gt; guard["malformed / undeclared / conflict guards"]
+  core --&gt; hook["before_tool_call hook"]
+  guard --&gt; hook
+  hook --&gt; exec["Tool execution"]
+  exec --&gt; approvals["exec/plugin approvals when required"]
+  exec --&gt; host["files / shell / web / media / channels"]
+  exec --&gt; results["tool events + transcript results"]</code></pre>
+            </details>
+          </div>
+
+          <h3>Plugin Control Plane</h3>
+          <p>
+            The manifest registry extracts plugin id, kind, channels, providers, model catalog, tool metadata, config schema, and contracts. Runtime load context applies auto-enable rules, then resolves workspace, env, and activation source config. Tool registration filters denylisted, optional, and unavailable tools, and rejects malformed, undeclared, or conflicting plugin tools.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/plugins/manifest-registry.ts:399</span>
+            <span class="chip">src/plugins/runtime/load-context.ts:46</span>
+            <span class="chip">src/plugins/runtime/runtime-registry-loader.ts:123</span>
+            <span class="chip">src/plugins/tools.ts:1113</span>
+            <span class="chip">src/plugins/tools.ts:1144</span>
+          </div>
+        </section>
+
+        <section id="multi-agent" class="section">
+          <h2>Multi-Agent Design</h2>
+          <p>
+            OpenClaw's multi-agent model is session and task based. A parent session can use <code>sessions_spawn</code> to create a subagent or ACP session. Child tasks get their own sessionKey, transcript, and lifecycle, then report back through internal events or messages. Plugin runtime surfaces can also receive subagent capabilities.
+          </p>
+          <div class="evidence">
+            <span class="chip">docs/tools/subagents.md</span>
+            <span class="chip">docs/tools/acp-agents.md</span>
+            <span class="chip">src/agents/tools/sessions-spawn-tool.ts:245</span>
+            <span class="chip">src/agents/tools/sessions-spawn-tool.ts:292</span>
+            <span class="chip">src/plugins/runtime/types.ts:79</span>
+          </div>
+
+          <div class="diagram-card">
+            <div class="diagram-head">
+              <h3>Multi-Agent Topology And Planes</h3>
+              <button data-open-diagram="multi-agent-topology">Open larger</button>
+            </div>
+            <div class="diagram-surface" id="multi-agent-topology">
+              <div class="mermaid">
+flowchart TB
+  parent["Parent session"] --> spawn["sessions_spawn / subagents"]
+  spawn --> sub["Subagent session&lt;br/&gt;agent:id:subagent:uuid"]
+  spawn --> acp["ACP runtime session"]
+  parent --> wait["sessions_yield / agent.wait"]
+  sub --> announce["task completion internal event"]
+  acp --> announce
+  announce --> gateway["Gateway"]
+  gateway --> parent
+  plugin["Native plugin runtime"] --> surface["Injected runtime&lt;br/&gt;agent / nodes / channel / llm / tasks"]
+  surface --> sub
+  gateway -. control plane .-> store["Session/task registry"]
+  sub -. execution plane .-> runner["Embedded runner"]
+  acp -. external harness .-> external["External ACP agent"]
+              </div>
+            </div>
+            <details>
+              <summary>Mermaid source</summary>
+              <pre><code>flowchart TB
+  parent["Parent session"] --&gt; spawn["sessions_spawn / subagents"]
+  spawn --&gt; sub["Subagent session&lt;br/&gt;agent:id:subagent:uuid"]
+  spawn --&gt; acp["ACP runtime session"]
+  parent --&gt; wait["sessions_yield / agent.wait"]
+  sub --&gt; announce["task completion internal event"]
+  acp --&gt; announce
+  announce --&gt; gateway["Gateway"]
+  gateway --&gt; parent
+  plugin["Native plugin runtime"] --&gt; surface["Injected runtime&lt;br/&gt;agent / nodes / channel / llm / tasks"]
+  surface --&gt; sub
+  gateway -. control plane .-&gt; store["Session/task registry"]
+  sub -. execution plane .-&gt; runner["Embedded runner"]
+  acp -. external harness .-&gt; external["External ACP agent"]</code></pre>
+            </details>
+          </div>
+        </section>
+
+        <section id="observability" class="section">
+          <h2>Observability</h2>
+          <p>
+            OpenClaw has a trajectory flight recorder. A run records <code>session.started</code> and <code>trace.metadata</code>, records <code>context.compiled</code> before prompt submission, records <code>prompt.submitted</code>, and finishes with <code>model.completed</code>, <code>trace.artifacts</code>, and <code>session.ended</code>. This gives enough evidence to inspect prompt, tools, usage, compaction, fallback, and transcript state after a turn.
+          </p>
+          <div class="evidence">
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2014</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:2026</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3263</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3477</span>
+            <span class="chip">src/agents/pi-embedded-runner/run/attempt.ts:3966</span>
+            <span class="chip">docs/tools/trajectory.md</span>
+          </div>
+          <p>
+            This matters because agent failures are rarely isolated model mistakes. They usually involve context, tools, model capabilities, permissions, memory, and delivery behavior. Trajectory turns those moving parts into an auditable bundle.
+          </p>
+        </section>
+
+        <section id="judgment" class="section">
+          <h2>Design Judgment</h2>
+          <h3>Strengths</h3>
+          <ul>
+            <li>The Gateway/runner split is clear: control plane for protocol, sessions, and tasks; execution plane for model and tool loops.</li>
+            <li><code>sessionKey</code> is the system spine: routing, delivery, memory visibility, subagents, and transcripts all attach to it.</li>
+            <li>Plugins are ownership boundaries: manifests provide static metadata, runtime surfaces provide trusted capabilities, and tool loading validates contracts.</li>
+            <li>Long-running work has real infrastructure: accepted ack, <code>agent.wait</code>, runId, dedupe, queue lanes, timeout, fallback, and trajectory.</li>
+            <li>Context engineering accounts for cost and caching: stable prompt prefix, dynamic heartbeat, compact tool search, and bounded memory results.</li>
+          </ul>
+          <h3>Complexity Hotspots</h3>
+          <ul>
+            <li>Hot paths must avoid broad plugin/provider/channel registry loading; the repo has many local rules enforcing this direction.</li>
+            <li>Session lifecycle and delivery context are easy places for cross-channel bugs, so prepared runtime facts and last-route state are critical.</li>
+            <li>Native plugins are trusted in-process code, not a hard sandbox; safety depends on config, permission policy, approvals, and contract validation.</li>
+            <li>Memory spans multiple backends, corpora, and visibility rules; retrieval quality and fallback behavior need live proof.</li>
+          </ul>
+          <h3>Interview-Ready Explanation</h3>
+          <p>
+            A useful way to explain OpenClaw is: it is an agent operating system for Slack, Telegram, Discord, local clients, and plugins. The Gateway is the kernel-like control plane, the session store is the process table plus transcript index, plugin manifests are the capability registry, the runner is the scheduler/executor, tools are system calls, and memory/RAG is searchable long-term state. The engineering goal is to wrap LLM uncertainty in deterministic protocol, queues, permissions, sessions, and audit trails.
+          </p>
+        </section>
+
+        <section id="reading-path" class="section">
+          <h2>Reading Path</h2>
+          <ol>
+            <li><code>docs/concepts/architecture.md</code>: Gateway and WebSocket control plane.</li>
+            <li><code>docs/concepts/agent-loop.md</code>: the full agent RPC-to-runner turn.</li>
+            <li><code>src/gateway/server-methods/agent.ts</code>: accepted ack, dedupe, session reset, dispatch.</li>
+            <li><code>src/agents/agent-command.ts</code>: model/provider/session/workspace/fallback orchestration.</li>
+            <li><code>src/agents/pi-embedded-runner/run.ts</code> and <code>src/agents/pi-embedded-runner/run/attempt.ts</code>: execution loop.</li>
+            <li><code>src/agents/system-prompt.ts</code> and <code>src/agents/workspace.ts</code>: context entry into the model.</li>
+            <li><code>src/agents/openclaw-tools.ts</code> and <code>src/plugins/tools.ts</code>: tool and plugin-tool boundaries.</li>
+            <li><code>extensions/memory-core/src/tools.ts</code> and <code>extensions/memory-core/src/memory/search-manager.ts</code>: memory/RAG.</li>
+            <li><code>docs/tools/subagents.md</code> and <code>src/agents/tools/sessions-spawn-tool.ts</code>: multi-agent behavior.</li>
+          </ol>
+        </section>
+
+        <section id="terminology-glossary" class="section">
+          <h2>Terminology Glossary</h2>
+          <table>
+            <thead><tr><th>Term</th><th>Meaning In This Project</th></tr></thead>
+            <tbody>
+              <tr><td>Gateway</td><td>The long-lived OpenClaw control plane for protocol, auth, sessions, events, tasks, and channel bridging.</td></tr>
+              <tr><td>SessionKey</td><td>The conversation identity key connecting agentId, channel, account, peer, subagent, and transcript state.</td></tr>
+              <tr><td>Embedded Pi runner</td><td>The default execution engine that compiles context, calls models, runs tools, and handles compaction/fallback.</td></tr>
+              <tr><td>ACP</td><td>An external agent harness path that can be spawned with <code>sessions_spawn({runtime:"acp"})</code>.</td></tr>
+              <tr><td>Manifest-first plugin</td><td>A plugin model where static capability metadata comes from a manifest before runtime code is loaded.</td></tr>
+              <tr><td>Trajectory</td><td>An exportable record of one agent turn: context, prompt, tools, usage, artifacts, errors, and terminal state.</td></tr>
+              <tr><td>Control plane</td><td>Scheduling, auth, session state, routing, audit, and policy decisions.</td></tr>
+              <tr><td>Execution plane</td><td>Model calls, tool execution, external harnesses, media work, and plugin runtime actions.</td></tr>
+              <tr><td>RAG</td><td>Retrieval-augmented generation: searching memory/wiki/session corpora and injecting selected results into model-visible context.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="unknowns" class="section">
+          <h2>Unknowns And Verification Checks</h2>
+          <div class="callout warn">
+            This report is static architecture analysis. The docs index and source inventory were read, but a live local Gateway turn was not started.
+          </div>
+          <ul>
+            <li>Provider/model behavior needs a real <code>agent</code> + <code>agent.wait</code> run with credentials to verify latency, fallback, and usage.</li>
+            <li>Memory/RAG quality depends on actual QMD installation, index state, and workspace memory files.</li>
+            <li>Channel delivery needs channel-specific proof for last route, threadId, quoted reply, and media upload behavior.</li>
+            <li>For code changes, choose verification by touched surface: targeted tests, <code>corepack pnpm check:changed</code>, or Testbox for broad lanes.</li>
+          </ul>
+        </section>
+
+        <p class="footer-note">
+          Generated file: <code>agent-codebase-analysis/agent-architecture-analysis-en.html</code>. The original Chinese report remains at <code>agent-codebase-analysis/agent-architecture-analysis.html</code>. Diagrams use Mermaid; if opened offline without CDN access, each diagram still includes its Mermaid source.
+        </p>
+      </main>
+    </div>
+
+    <div class="modal" id="diagram-modal" aria-hidden="true">
+      <div class="modal-panel">
+        <div class="modal-top">
+          <div class="modal-title" id="modal-title">Diagram</div>
+          <button id="modal-close">Close</button>
+        </div>
+        <div class="modal-content" id="modal-content"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "loose",
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e8f4f8",
+          primaryTextColor: "#172033",
+          primaryBorderColor: "#9bbdcc",
+          lineColor: "#6c7a8b",
+          secondaryColor: "#f6eee8",
+          tertiaryColor: "#ffffff",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+
+      const modal = document.getElementById("diagram-modal");
+      const modalContent = document.getElementById("modal-content");
+      const modalTitle = document.getElementById("modal-title");
+      const closeButton = document.getElementById("modal-close");
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        modalContent.innerHTML = "";
+      }
+
+      document.querySelectorAll("[data-open-diagram]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.getAttribute("data-open-diagram");
+          const source = id ? document.getElementById(id) : null;
+          if (!source) return;
+          const title = button.closest(".diagram-card")?.querySelector("h3")?.textContent ?? "Diagram";
+          modalTitle.textContent = title;
+          modalContent.innerHTML = source.innerHTML;
+          modal.classList.add("open");
+          modal.setAttribute("aria-hidden", "false");
+        });
+      });
+
+      closeButton.addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeModal();
+      });
+    </script>
+  </body>
+</html>
