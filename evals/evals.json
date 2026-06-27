@@ -1,0 +1,82 @@
+{
+  "should_trigger": [
+    {
+      "prompt": "Analyze this mature agent project and explain how its harness constrains behavior.",
+      "reason": "Direct request for agent harness/runtime design analysis."
+    },
+    {
+      "prompt": "Explain how this single-agent coding system maintains context, tools, artifacts, and task state during long tasks.",
+      "reason": "Requests single-agent long-task design analysis."
+    },
+    {
+      "prompt": "Look at this multi-agent repo and tell me whether the coordination architecture is actually justified.",
+      "reason": "Requests multi-agent topology, state sharing, permissions, and coordination-cost analysis."
+    },
+    {
+      "prompt": "Create a polished HTML architecture report for this LLM-agent system with diagrams.",
+      "reason": "Requests the skill's single user-facing HTML report."
+    },
+    {
+      "prompt": "Analyze this agent repo and include Mermaid diagrams for the harness, context flow, tools, and state machine.",
+      "reason": "Requests mandatory Mermaid architecture visualization."
+    },
+    {
+      "prompt": "The Mermaid diagrams are too small. Update the agent architecture report so diagrams can be zoomed and complex diagrams are split.",
+      "reason": "Requests diagram readability and zoom behavior for the HTML report."
+    },
+    {
+      "prompt": "Analyze this agent project and explain the difference between SOUL.md and USER.md.",
+      "reason": "Requests project-native instruction/memory file analysis."
+    },
+    {
+      "prompt": "Explain this agent project in simple language and add a glossary for English architecture terms like workspace bootstrap files.",
+      "reason": "Requests plain-language explanation and terminology glossary."
+    },
+    {
+      "prompt": "Analyze this agent project and include a glossary that explains project terms and agent interview terms that matter for understanding the architecture.",
+      "reason": "Requests glossary selection that includes project-native and interview-frequency agent design terms."
+    }
+  ],
+  "should_not_trigger": [
+    {
+      "prompt": "Rewrite this repository from scratch.",
+      "reason": "This asks for implementation recreation, while this skill explains design."
+    },
+    {
+      "prompt": "List every file and what it does.",
+      "reason": "This asks for filesystem inventory, not design analysis."
+    },
+    {
+      "prompt": "Fix this failing pytest test.",
+      "reason": "This is debugging or implementation work."
+    },
+    {
+      "prompt": "Summarize repository size statistics and language composition.",
+      "reason": "This is repository statistics, not agent system design."
+    }
+  ],
+  "quality_checks": [
+    "The final user-facing deliverable is one self-contained HTML file named agent-codebase-analysis/agent-architecture-analysis.html.",
+    "inventory.json, if produced, is internal scratch under .analysis-work and is not presented as a user-facing output.",
+    "The skill does not produce evidence-map.html, design-report.md, key-mechanisms.md, or architecture-visuals.md as primary deliverables.",
+    "The HTML report combines executive summary, design analysis, key mechanisms, diagrams, evidence citations, reading path, and verification checks.",
+    "Mermaid diagrams are mandatory and embedded in the same HTML. The report includes at least system boundary, request lifecycle, harness state machine, context/memory flow, tool/action/RAG flow, and multi-agent topology or control-plane/execution-plane split when applicable.",
+    "Each Mermaid diagram has a plain-language explanation and evidence citations.",
+    "Each Mermaid/SVG diagram has a visible zoom/open-larger interaction, and overly complex diagrams are split rather than rendered with tiny text.",
+    "If compiled SVG is unavailable, the HTML includes renderable Mermaid source blocks and Mermaid initialization rather than omitting diagrams.",
+    "Mechanisms are explained in plain language before code citations; class names and function names are used only as evidence, not as the explanation itself.",
+    "Each major section uses three layers: newcomer-friendly explanation, architecture details, and representative code evidence.",
+    "The table of contents includes a terminology glossary section when English-only or project-native terms may confuse newcomers.",
+    "When the glossary exists, the table of contents includes a visible anchor link to it, preferably #terminology-glossary.",
+    "Glossary term selection considers general architecture terms, project-native concepts, English-only phrases, and interview-frequency agent design terms that are relevant to the project.",
+    "The report starts from the system task boundary: user job, input, output, success condition, and dominant complexity.",
+    "The report treats the harness as the core object and explains runtime loop, state machine, context management, tool execution, model abstraction, permissions, persistence/replay, and observability.",
+    "For single-agent systems, the report explains long-task progress: goal/plan formation, task workbench, error recovery, context budget, and completion checks.",
+    "For multi-agent systems, the report explains topology, responsibility boundaries, shared versus isolated state, communication protocol, merge/verification, termination, permission model, and coordination cost.",
+    "RAG/knowledge, if present, is explained as a project-specific pipeline from ingestion through retrieval, ranking, context insertion, citations, update, and evaluation.",
+    "Project-native concepts and instruction/memory files such as SOUL.md, USER.md, AGENTS.md, CLAUDE.md, SKILL.md, MEMORY.md, or PROFILE.md are explained when present.",
+    "Important sections include interview-ready explanation callouts that teach how to explain the architecture clearly.",
+    "The report cites representative files/functions/classes as evidence for design claims without cataloging every file.",
+    "The output avoids byte counts, extension histograms, raw file inventories, exhaustive function lists, per-line code explanations, and implementation recreation checklists."
+  ]
+}

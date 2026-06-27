@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Agent Codebase"
+  short_description: "Create agent architecture HTML"
+  default_prompt: "Use $analyze-agent-codebase to create a polished single-file HTML architecture analysis for this LLM-agent project. Use plain-language explanations, zoomable Mermaid diagrams for key architecture flows, and a glossary for English, project-specific, and interview-relevant agent terms."

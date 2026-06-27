@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.analysis-work/
+agent-codebase-analysis/
+.DS_Store
+Thumbs.db
